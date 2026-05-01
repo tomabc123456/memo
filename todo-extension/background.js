@@ -14,8 +14,15 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (type === 'reminder') body = '⏰ 还有 ' + fmtMin(task.reminderMinutes) + ' 截止';
   else if (type === 'expired') body = '🚨 任务已逾期！';
   else if (type === 'interval') {
+    task.intervalCount = (task.intervalCount || 0) + 1;
     body = '🔁 间歇提醒 · 距截止 ' + (timeLeft(task.deadline)?.text || '尚未完成');
-    chrome.alarms.create(taskId + '|interval', { delayInMinutes: task.intervalMinutes });
+    await chrome.storage.local.set({ tasks });
+    const overdueMs = task.deadline ? Date.now() - new Date(task.deadline).getTime() : -1;
+    const stopByOverdue = overdueMs > 24 * 3600 * 1000;
+    const stopByCount = task.intervalCount >= 20;
+    if (!stopByOverdue && !stopByCount) {
+      chrome.alarms.create(taskId + '|interval', { delayInMinutes: task.intervalMinutes });
+    }
   }
   const title = '[' + task.priority + '] ' + task.title;
 
@@ -40,6 +47,7 @@ function registerAlarms(task) {
   if (ra > now) chrome.alarms.create(task.id + '|reminder', { when: ra });
   if (dl > now) chrome.alarms.create(task.id + '|expired', { when: dl });
   if (task.intervalEnabled) {
+    if (now - dl > 24 * 3600 * 1000) return;  // 逾期超 24h 不再注册
     const startAt = Math.max(ra > now ? ra : now + (task.intervalMinutes||60)*60000, now + 60000);
     chrome.alarms.create(task.id + '|interval', { when: startAt });
   }
@@ -48,7 +56,12 @@ function registerAlarms(task) {
 async function refreshAllAlarms() {
   await chrome.alarms.clearAll();
   const r = await chrome.storage.local.get(['tasks']);
-  (r.tasks || []).forEach(registerAlarms);
+  const tasks = r.tasks || [];
+  // 全量重建时重置所有任务的 interval 计数
+  let changed = false;
+  tasks.forEach(t => { if (t.intervalCount) { t.intervalCount = 0; changed = true; } });
+  if (changed) await chrome.storage.local.set({ tasks });
+  tasks.forEach(registerAlarms);
 }
 
 async function migrateLegacy() {
