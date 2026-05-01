@@ -68,6 +68,17 @@ async function backupToTelegram() {
   } catch(e){alert('❌ 网络错误：'+e.message);}
 }
 
+// ── 本地导出 JSON ──────────────────────────────
+function exportLocal() {
+  const data={version:1,exportedAt:new Date().toISOString(),tasks:state.tasks,settings:state.settings};
+  const ts=new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  const filename='todo-export-'+ts+'.json';
+  const url=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));
+  const a=el('a',{href:url,download:filename});
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
 // ── 导入数据（接收 File 对象）──────────────────────────────
 async function importFile(file) {
   try {
@@ -132,6 +143,7 @@ function renderList() {
 
   hdr.appendChild(el('div',{style:{display:'flex',gap:6}},
     btn('备份',()=>backupToTelegram(),{background:'#F1F5F9',padding:'7px 10px',fontSize:13}),
+    btn('导出',()=>exportLocal(),{background:'#F1F5F9',padding:'7px 10px',fontSize:13}),
     importBtn,
     btn('设置',()=>{state.view='settings';render();},{background:'#F1F5F9',padding:'7px 10px',fontSize:13}),
     btn('新建',()=>{state.editTask=null;state.view='add';render();},{background:'#3B82F6',color:'#fff',padding:'7px 13px',fontSize:13})
