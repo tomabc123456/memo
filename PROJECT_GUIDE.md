@@ -216,7 +216,7 @@ state mutate → saveTasks() → chrome.storage.local.set
 | 所有定时走 `chrome.alarms` | ✅ 已遵守 |
 | 统一 `chrome.storage.local` | ✅ 已遵守 |
 | 富文本一律 `innerHTML` | ✅ tipBox / msg / dropHint 已用 |
-| 样式数值用数字（让 `el()` 自动补 px） | ⚠️ 不一致：很多地方写 `borderRadius:'10px'`、`padding:'12px'` 等字符串。`PX_PROPS` 集合本来就支持数字，建议统一改成数字（迁移见 §10） |
+| 样式数值用数字（让 `el()` 自动补 px） | ✅ 已统一（v1.1 / T6）：单值用数字（如 `borderRadius:10`、`padding:16`），多值简写保留字符串（如 `padding:'12px 22px'`） |
 | flex 关键间距用 `marginRight` 而非 `gap` | ⚠️ 大量使用 `gap`，目前未见明显问题，但 `flexWrap` 场景需警惕 |
 
 ### DOM 工厂 `el()` 速记
