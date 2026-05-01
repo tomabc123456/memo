@@ -1,0 +1,15 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width: 480px; margin: 0; padding: 0; }
+body {
+  min-height: 600px;
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
+  background: #F8FAFC; font-size: 14px; color: #1E293B;
+  line-height: 1.5; overflow-y: auto;
+}
+#app { display: flex; flex-direction: column; min-height: 600px; }
+button { font-family: inherit; }
+input, select, textarea { font-family: inherit; outline: none; }
+input[type='datetime-local'] { cursor: pointer; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
