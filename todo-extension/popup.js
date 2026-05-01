@@ -32,6 +32,45 @@ const inpStyle = { width:'100%',padding:'8px 12px',border:'1px solid #E2E8F0',bo
 const inp = (type='text',value='',placeholder='',oninput) => { const e=el('input',{type,placeholder,style:inpStyle}); e.value=value||''; if(oninput)e.addEventListener('input',oninput); return e; };
 const lbl = text => el('div',{style:{fontSize:13,fontWeight:600,color:'#475569',marginBottom:6}},text);
 
+// ── 应用内 toast / dialog ──────────────────────────────
+let __toastTimer;
+function showToast(msg, type='info') {
+  let t=document.getElementById('__toast');
+  if(!t){
+    t=el('div',{id:'__toast',style:{position:'fixed',top:14,right:14,padding:'10px 16px',borderRadius:9,fontSize:13,fontWeight:600,zIndex:9999,boxShadow:'0 4px 12px rgba(0,0,0,0.15)',display:'none'}});
+    document.body.appendChild(t);
+  }
+  const palette=({info:['#EFF6FF','#1D4ED8'],ok:['#F0FDF4','#15803D'],err:['#FEF2F2','#DC2626']})[type]||['#F1F5F9','#334155'];
+  t.style.background=palette[0]; t.style.color=palette[1];
+  t.textContent=msg;
+  t.style.display='block';
+  clearTimeout(__toastTimer);
+  __toastTimer=setTimeout(()=>{t.style.display='none';},3000);
+}
+
+function showDialog({title='确认',body='',confirmText='确认',cancelText='取消',danger=false}={}) {
+  return new Promise(resolve=>{
+    let mask;
+    const close=ok=>{ if(mask)document.body.removeChild(mask); document.removeEventListener('keydown',onKey); resolve(ok); };
+    const onKey=e=>{ if(e.key==='Escape')close(false); };
+    const titleEl=el('div',{style:{fontSize:15,fontWeight:700,marginBottom:10}},title);
+    const bodyEl=el('div',{style:{fontSize:13,color:'#475569',lineHeight:1.6,marginBottom:16}});
+    bodyEl.innerHTML=body;
+    const btnRow=el('div',{style:{display:'flex',justifyContent:'flex-end',gap:8}},
+      btn(cancelText,()=>close(false),{background:'#F1F5F9',color:'#64748B',padding:'8px 14px',fontSize:13}),
+      btn(confirmText,()=>close(true),
+        danger
+          ?{background:'#FEF2F2',color:'#EF4444',border:'1px solid #FECACA',padding:'8px 14px',fontSize:13}
+          :{background:'#3B82F6',color:'#fff',padding:'8px 14px',fontSize:13})
+    );
+    const dialog=el('div',{style:{background:'#fff',borderRadius:12,padding:'18px 22px',minWidth:280,maxWidth:380,boxShadow:'0 10px 30px rgba(0,0,0,0.2)'}},titleEl,bodyEl,btnRow);
+    mask=el('div',{style:{position:'fixed',inset:0,background:'rgba(15,23,42,0.45)',zIndex:9998,display:'flex',alignItems:'center',justifyContent:'center'}},dialog);
+    mask.addEventListener('click',e=>{ if(e.target===mask)close(false); });
+    document.body.appendChild(mask);
+    document.addEventListener('keydown',onKey);
+  });
+}
+
 // ── 状态 ──────────────────────────────
 let state = { tasks:[], settings:{botToken:'',chatId:''}, view:'list', editTask:null, commentTask:null, confirmDeleteId:null, filter:'active', sortBy:'priority' };
 
@@ -49,7 +88,7 @@ async function saveSettings() { await chrome.storage.local.set({settings:state.s
 // ── 备份到 Telegram ──────────────────────────────
 async function backupToTelegram() {
   const {botToken,chatId} = state.settings;
-  if(!botToken||!chatId){alert('❌ 请先在设置中配置 Telegram');return;}
+  if(!botToken||!chatId){showToast('请先在设置中配置 Telegram','err');return;}
   const token = cleanTelegramToken(botToken);
   const data = {version:1,exportedAt:new Date().toISOString(),tasks:state.tasks,settings:state.settings};
   const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
@@ -63,9 +102,9 @@ async function backupToTelegram() {
   try {
     const r=await fetch('https://api.telegram.org/bot'+token+'/sendDocument',{method:'POST',body:fd});
     const d=await r.json();
-    if(d.ok) alert('✅ 备份成功！\n文件名：'+filename);
-    else alert('❌ 备份失败：'+(d.error_code||'')+' '+(d.description||''));
-  } catch(e){alert('❌ 网络错误：'+e.message);}
+    if(d.ok) showToast('备份成功：'+filename,'ok');
+    else showToast('备份失败：'+(d.error_code||'')+' '+(d.description||''),'err');
+  } catch(e){showToast('网络错误：'+e.message,'err');}
 }
 
 // ── 本地导出 JSON ──────────────────────────────
@@ -88,16 +127,16 @@ async function importFile(file) {
     else if(Array.isArray(data.tasks)){tasks=data.tasks;settings=data.settings;}
     else if(data.todo_tasks){tasks=typeof data.todo_tasks==='string'?JSON.parse(data.todo_tasks):data.todo_tasks;if(data.todo_settings)settings=typeof data.todo_settings==='string'?JSON.parse(data.todo_settings):data.todo_settings;}
     else throw new Error('文件格式不正确');
-    const ok=confirm('导入 '+tasks.length+' 条任务\n\n确定 = 合并到现有数据\n取消 = 替换全部数据');
+    const ok=await showDialog({title:'导入数据',body:'共 '+tasks.length+' 条任务<br>请选择导入方式',confirmText:'合并',cancelText:'替换'});
     tasks.forEach(t=>{if(!t.id)t.id=Date.now().toString()+Math.random().toString(36).slice(2,6);if(!t.priority)t.priority='P1';if(t.completed===undefined)t.completed=false;if(t.reminderMinutes===undefined)t.reminderMinutes=30;if(t.intervalEnabled===undefined)t.intervalEnabled=false;if(t.intervalMinutes===undefined)t.intervalMinutes=60;if(!Array.isArray(t.comments))t.comments=[];});
     if(ok){const existIds=new Set(state.tasks.map(t=>t.id));tasks.forEach(t=>{if(existIds.has(t.id))t.id=Date.now().toString()+Math.random().toString(36).slice(2,6);});state.tasks=[...tasks,...state.tasks];}
-    else{if(!confirm('⚠️ 确认替换全部数据？现有 '+state.tasks.length+' 条将被覆盖'))return false;}
+    else{if(!await showDialog({title:'确认替换',body:'现有 '+state.tasks.length+' 条任务将被覆盖<br>此操作无法撤销',confirmText:'确认替换',danger:true}))return false;}
     state.tasks=ok?state.tasks:tasks;
     if(settings)state.settings={...state.settings,...settings};
     await saveTasks(); await saveSettings();
-    alert('✅ 导入成功！共 '+state.tasks.length+' 条任务');
+    showToast('导入成功，共 '+state.tasks.length+' 条','ok');
     return true;
-  } catch(err){alert('❌ 导入失败：'+err.message); return false;}
+  } catch(err){showToast('导入失败：'+err.message,'err'); return false;}
 }
 
 // ── 渲染入口 ──────────────────────────────
@@ -409,7 +448,7 @@ function renderTaskForm(isEdit) {
   form.appendChild(el('div',{style:{display:'flex',gap:'8px',justifyContent:'flex-end',paddingTop:'4px'}},
     btn('取消',()=>{state.view='list';render();},{background:'#F1F5F9',color:'#64748B',padding:'8px 14px',fontSize:'13.5px',minWidth:'72px'}),
     btn('保存',async()=>{
-      if(!f.title.trim())return alert('请输入任务标题');
+      if(!f.title.trim()){showToast('请输入任务标题','err');return;}
       if(isEdit){Object.assign(orig,f);}
       else{state.tasks.unshift({...f,id:Date.now().toString()+Math.random().toString(36).slice(2,6),completed:false,createdAt:new Date().toISOString(),comments:[]});}
       await saveTasks(); state.view='list'; render();
