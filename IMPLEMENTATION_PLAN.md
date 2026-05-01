@@ -411,7 +411,7 @@ function showDialog({ title='确认', body='', confirmText='确认', cancelText=
 
 > 每完成一项，把 `[ ]` 改成 `[x]`，并在右侧填 commit hash。
 
-- [ ] T1 抽 utils.js 公共模块 — `_______`
+- [x] T1 抽 utils.js 公共模块 — `480995f`
 - [ ] T2 表单支持无截止时间 — `_______`
 - [ ] T3 列表头新增导出 JSON — `_______`
 - [ ] T4 间歇提醒双重停止条件 — `_______`

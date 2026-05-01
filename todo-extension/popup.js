@@ -347,10 +347,12 @@ function renderTaskForm(isEdit) {
   });
   pcCard.appendChild(prow);
   pcCard.appendChild(el('span',{style:sectionLabel},'📅 截止时间'));
-  const dlInp=el('input',{type:'datetime-local',style:inpModern});
-  dlInp.value=f.deadline;
+  const dlInp=el('input',{type:'datetime-local',style:{...inpModern,flex:1}});
+  dlInp.value=f.deadline||'';
   dlInp.addEventListener('change',()=>f.deadline=dlInp.value);
-  pcCard.appendChild(dlInp);
+  const clearDlBtn=btn('清空',()=>{dlInp.value='';f.deadline='';},
+    {background:'transparent',color:'#94A3B8',border:'1px solid #E2E8F0',borderRadius:8,padding:'8px 12px',fontSize:12,fontWeight:500,flexShrink:0});
+  pcCard.appendChild(el('div',{style:{display:'flex',gap:6,alignItems:'stretch'}},dlInp,clearDlBtn));
   form.appendChild(pcCard);
 
   // 提醒设置卡片
