@@ -1,27 +1,8 @@
 
-const PC = {
-  P0: { color:'#EF4444', bg:'#FEF2F2', border:'#FECACA', text:'紧急' },
-  P1: { color:'#F97316', bg:'#FFF7ED', border:'#FED7AA', text:'高优先' },
-  P2: { color:'#3B82F6', bg:'#EFF6FF', border:'#BFDBFE', text:'中优先' },
-  P3: { color:'#6B7280', bg:'#F9FAFB', border:'#E5E7EB', text:'低优先' },
-};
-const REMINDER_OPTS = [10,15,30,60,120,360,1440,2880,4320];
-const INTERVAL_OPTS  = [15,30,60,120,240,1440,2880];
-const P_ORDER = { P0:0, P1:1, P2:2, P3:3 };
+// PC / P_ORDER / REMINDER_OPTS / INTERVAL_OPTS / fmtMin / fmtDT / timeLeft / cleanTelegramToken
+// 已抽到 utils.js（popup.html 中先于 popup.js 加载）
 
-function fmtMin(m) { return m<60?m+' 分钟':m<1440?(m/60)+' 小时':(m/1440)+' 天'; }
-function fmtDT(dt) { if(!dt)return''; return new Date(dt).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}); }
 function getDefaultDeadline() { const d=new Date(),p=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'T19:30'; }
-function timeLeft(deadline) {
-  if(!deadline)return null;
-  const diff=new Date(deadline)-new Date();
-  if(diff<0)return{expired:true,text:'已逾期'};
-  const h=Math.floor(diff/3600000),m=Math.floor((diff%3600000)/60000);
-  if(h>=48)return{text:Math.floor(h/24)+'天后'};
-  if(h>=24)return{text:'明天'};
-  if(h>0)return{text:h+'时'+m+'分后',urgent:h<3};
-  return{text:m+'分钟后',urgent:true};
-}
 
 // ── DOM 工厂（自动补 px）──────────────────────────────
 const PX_PROPS = new Set(['width','height','minWidth','minHeight','maxWidth','maxHeight','top','left','right','bottom','margin','marginTop','marginRight','marginBottom','marginLeft','padding','paddingTop','paddingRight','paddingBottom','paddingLeft','borderRadius','borderWidth','fontSize','lineHeight','letterSpacing','gap','rowGap','columnGap']);
@@ -69,7 +50,7 @@ async function saveSettings() { await chrome.storage.local.set({settings:state.s
 async function backupToTelegram() {
   const {botToken,chatId} = state.settings;
   if(!botToken||!chatId){alert('❌ 请先在设置中配置 Telegram');return;}
-  const token = String(botToken).trim().replace(/^bot/i,'').replace(/[\u2013\u2014]/g,'-');
+  const token = cleanTelegramToken(botToken);
   const data = {version:1,exportedAt:new Date().toISOString(),tasks:state.tasks,settings:state.settings};
   const ts = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
   const filename = 'todo-backup-'+ts+'.json';
@@ -496,7 +477,7 @@ function renderSettings() {
   const re=el('div',{style:{display:'none',padding:9,borderRadius:8,fontSize:12,fontWeight:500}}); form.appendChild(re);
   form.appendChild(el('div',{style:{display:'flex',gap:9,justifyContent:'space-between',flexWrap:'wrap',marginTop:4}},
     btn('测试',async()=>{
-      const token=String(f.botToken||'').trim().replace(/^bot/i,'').replace(/[\u2013\u2014]/g,'-'),chatId=String(f.chatId||'').trim();
+      const token=cleanTelegramToken(f.botToken),chatId=String(f.chatId||'').trim();
       ti.value=token; ci.value=chatId; f.botToken=token; f.chatId=chatId;
       try{const r=await fetch('https://api.telegram.org/bot'+token+'/sendMessage',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({chat_id:chatId,text:'✅ 智能待办清单测试通知成功！🎉'})});const d=await r.json();re.style.display='block';re.style.background=d.ok?'#F0FDF4':'#FEF2F2';re.style.color=d.ok?'#15803D':'#DC2626';re.textContent=d.ok?'✅ 发送成功！请查看 Telegram':'❌ '+(d.error_code||'')+' '+(d.description||'');}catch(e){re.style.display='block';re.style.background='#FEF2F2';re.style.color='#DC2626';re.textContent='❌ 网络错误：'+e.message;}
     },{background:'#F1F5F9',color:'#64748B'}),

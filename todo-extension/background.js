@@ -1,22 +1,6 @@
+importScripts('utils.js');
 
-function fmtMin(m) {
-  if (m < 60) return m + ' 分钟';
-  if (m < 1440) return (m/60) + ' 小时';
-  return (m/1440) + ' 天';
-}
-function fmtDT(dt) {
-  if (!dt) return '';
-  return new Date(dt).toLocaleString('zh-CN', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' });
-}
-function timeLeftText(deadline) {
-  if (!deadline) return '';
-  const diff = new Date(deadline) - new Date();
-  if (diff < 0) return '已逾期';
-  const h = Math.floor(diff/3600000), m = Math.floor((diff%3600000)/60000);
-  if (h >= 24) return Math.floor(h/24) + '天后';
-  if (h > 0) return h + '时' + m + '分后';
-  return m + '分钟后';
-}
+// fmtMin / fmtDT / timeLeft / cleanTelegramToken 已抽到 utils.js
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   const { name } = alarm;
@@ -30,7 +14,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (type === 'reminder') body = '⏰ 还有 ' + fmtMin(task.reminderMinutes) + ' 截止';
   else if (type === 'expired') body = '🚨 任务已逾期！';
   else if (type === 'interval') {
-    body = '🔁 间歇提醒 · 距截止 ' + (timeLeftText(task.deadline) || '尚未完成');
+    body = '🔁 间歇提醒 · 距截止 ' + (timeLeft(task.deadline)?.text || '尚未完成');
     chrome.alarms.create(taskId + '|interval', { delayInMinutes: task.intervalMinutes });
   }
   const title = '[' + task.priority + '] ' + task.title;
@@ -41,7 +25,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   });
 
   if (settings.botToken && settings.chatId) {
-    const token = String(settings.botToken).trim().replace(/^bot/i,'').replace(/[\u2013\u2014]/g,'-');
+    const token = cleanTelegramToken(settings.botToken);
     fetch('https://api.telegram.org/bot' + token + '/sendMessage', {
       method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ chat_id: settings.chatId, text: '🔔 *待办提醒*\n\n[' + task.priority + '] *' + task.title + '*\n' + body + (task.deadline ? '\n📅 截止：' + fmtDT(task.deadline) : ''), parse_mode:'Markdown' })
