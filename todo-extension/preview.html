@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>智能待办清单 - 预览</title>
+  <link rel="stylesheet" href="style.css" />
+  <script>
+    // Mock chrome extension APIs for browser preview
+    const _now = Date.now();
+    const _store = {
+      tasks: [
+        { id:'1', title:'完成季度财务报告', priority:'P0', completed:false, taskType:'钱包', createdAt:'2026-05-01T00:00:00.000Z',
+          deadline: new Date(_now + 2*3600*1000).toISOString().slice(0,16),
+          reminderMinutes:30, intervalEnabled:false, intervalMinutes:60,
+          comments:[
+            {id:'c1', text:'数据需要从 ERP 系统导出', createdAt: new Date(_now - 3600*1000).toISOString()},
+            {id:'c2', text:'格式参考 Q3 模板', createdAt: new Date(_now - 1800*1000).toISOString()}
+          ] },
+        { id:'2', title:'准备周会 PPT', priority:'P1', completed:false, taskType:'任务', createdAt:'2026-05-01T00:00:00.000Z',
+          deadline: new Date(_now + 26*3600*1000).toISOString().slice(0,16),
+          reminderMinutes:60, intervalEnabled:true, intervalMinutes:120, comments:[] },
+        { id:'3', title:'联系供应商确认交货期', priority:'P1', completed:false, createdAt:'2026-05-01T00:00:00.000Z',
+          deadline: new Date(_now + 3*24*3600*1000).toISOString().slice(0,16),
+          reminderMinutes:30, intervalEnabled:false, intervalMinutes:60, comments:[] },
+        { id:'4', title:'更新项目文档', priority:'P2', completed:true,
+          deadline: new Date(_now - 24*3600*1000).toISOString().slice(0,16),
+          reminderMinutes:30, intervalEnabled:false, intervalMinutes:60, comments:[] },
+        { id:'5', title:'读完《深度工作》最后两章', priority:'P3', completed:false, createdAt:'2026-05-01T00:00:00.000Z',
+          deadline:'', reminderMinutes:30, intervalEnabled:false, intervalMinutes:60, comments:[] }
+      ],
+      settings: { botToken:'', chatId:'' }
+    };
+    window.chrome = {
+      storage: {
+        local: {
+          get: (keys) => {
+            if (Array.isArray(keys)) return Promise.resolve(Object.fromEntries(keys.map(k=>[k,_store[k]])));
+            if (typeof keys === 'string') return Promise.resolve({[keys]:_store[keys]});
+            return Promise.resolve({..._store});
+          },
+          set: (obj) => { Object.assign(_store, obj); return Promise.resolve(); },
+          onChanged: { addListener: ()=>{} }
+        }
+      },
+      runtime: {
+        sendMessage: ()=>Promise.resolve({ok:true}),
+        onMessage: { addListener: ()=>{} }
+      },
+      alarms: { create:()=>{}, clear:()=>{}, clearAll:()=>Promise.resolve() }
+    };
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+  <script src="utils.js?v=6"></script>
+  <script src="popup.js?v=13"></script>
+</body>
+</html>

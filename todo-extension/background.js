@@ -85,6 +85,8 @@ async function migrateLegacy() {
     if (t.intervalEnabled===undefined) { t.intervalEnabled=false; changed=true; }
     if (t.intervalMinutes===undefined) { t.intervalMinutes=60; changed=true; }
     if (!Array.isArray(t.comments)) { t.comments=[]; changed=true; }
+    if (!t.taskType) { t.taskType='任务'; changed=true; }
+    if (!t.createdAt) { t.createdAt='2026-05-01T00:00:00.000Z'; changed=true; }
   });
   if (changed) await chrome.storage.local.set({ tasks });
 }

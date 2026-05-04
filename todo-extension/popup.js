@@ -32,6 +32,27 @@ const inpStyle = { width:'100%',padding:'8px 12px',border:'1px solid #E2E8F0',bo
 const inp = (type='text',value='',placeholder='',oninput) => { const e=el('input',{type,placeholder,style:inpStyle}); e.value=value||''; if(oninput)e.addEventListener('input',oninput); return e; };
 const lbl = text => el('div',{style:{fontSize:13,fontWeight:600,color:'#475569',marginBottom:6}},text);
 
+// ── 自定义 tooltip ──────────────────────────────
+function showTip(target, text) {
+  let t = document.getElementById('__tip');
+  if (!t) {
+    t = el('div', {id:'__tip', style:{position:'fixed',zIndex:9999,background:'#1E293B',color:'#F8FAFC',padding:'6px 10px',borderRadius:6,fontSize:12.5,lineHeight:'1.6',maxWidth:320,wordBreak:'break-all',boxShadow:'0 4px 12px rgba(0,0,0,0.25)',pointerEvents:'none',display:'none'}});
+    document.body.appendChild(t);
+  }
+  t.textContent = text;
+  t.style.display = 'block';
+  const r = target.getBoundingClientRect();
+  let left = r.left;
+  if (left + 320 > window.innerWidth) left = window.innerWidth - 328;
+  t.style.left = left + 'px';
+  const tipH = t.offsetHeight;
+  t.style.top = (r.top - tipH - 6 > 0 ? r.top - tipH - 6 : r.bottom + 5) + 'px';
+}
+function hideTip() {
+  const t = document.getElementById('__tip');
+  if (t) t.style.display = 'none';
+}
+
 // ── 应用内 toast / dialog ──────────────────────────────
 let __toastTimer;
 function showToast(msg, type='info') {
@@ -128,7 +149,7 @@ async function importFile(file) {
     else if(data.todo_tasks){tasks=typeof data.todo_tasks==='string'?JSON.parse(data.todo_tasks):data.todo_tasks;if(data.todo_settings)settings=typeof data.todo_settings==='string'?JSON.parse(data.todo_settings):data.todo_settings;}
     else throw new Error('文件格式不正确');
     const ok=await showDialog({title:'导入数据',body:'共 '+tasks.length+' 条任务<br>请选择导入方式',confirmText:'合并',cancelText:'替换'});
-    tasks.forEach(t=>{if(!t.id)t.id=Date.now().toString()+Math.random().toString(36).slice(2,6);if(!t.priority)t.priority='P1';if(t.completed===undefined)t.completed=false;if(t.reminderMinutes===undefined)t.reminderMinutes=30;if(t.intervalEnabled===undefined)t.intervalEnabled=false;if(t.intervalMinutes===undefined)t.intervalMinutes=60;if(!Array.isArray(t.comments))t.comments=[];});
+    tasks.forEach(t=>{if(!t.id)t.id=Date.now().toString()+Math.random().toString(36).slice(2,6);if(!t.priority)t.priority='P1';if(t.completed===undefined)t.completed=false;if(t.reminderMinutes===undefined)t.reminderMinutes=30;if(t.intervalEnabled===undefined)t.intervalEnabled=false;if(t.intervalMinutes===undefined)t.intervalMinutes=60;if(!Array.isArray(t.comments))t.comments=[];if(!t.createdAt)t.createdAt='2026-05-01T00:00:00.000Z';});
     if(ok){const existIds=new Set(state.tasks.map(t=>t.id));tasks.forEach(t=>{if(existIds.has(t.id))t.id=Date.now().toString()+Math.random().toString(36).slice(2,6);});state.tasks=[...tasks,...state.tasks];}
     else{if(!await showDialog({title:'确认替换',body:'现有 '+state.tasks.length+' 条任务将被覆盖<br>此操作无法撤销',confirmText:'确认替换',danger:true}))return false;}
     state.tasks=ok?state.tasks:tasks;
@@ -295,10 +316,10 @@ function renderList() {
 function renderCard(task) {
   const p=PC[task.priority]||PC.P1, tl=timeLeft(task.deadline), cc=(task.comments&&task.comments.length)||0;
 
-  const card=el('div',{style:{background:'#fff',borderRadius:12,marginBottom:8,padding:'10px 16px',border:'1px solid '+(task.completed?'#E2E8F0':p.border),borderLeft:'4px solid '+(task.completed?'#CBD5E1':p.color),opacity:task.completed?0.55:1,display:'flex',alignItems:'flex-start',gap:14}});
+  const card=el('div',{style:{background:'#fff',borderRadius:12,marginBottom:8,padding:'10px 16px',border:'1px solid '+(task.completed?'#E2E8F0':p.border),borderLeft:'4px solid '+(task.completed?'#CBD5E1':p.color),opacity:task.completed?0.55:1,display:'flex',alignItems:'flex-start',gap:14,position:'relative'}});
 
   // 左侧
-  const leftZone=el('div',{style:{flex:1,minWidth:0,display:'flex',alignItems:'flex-start'}});
+  const leftZone=el('div',{style:{flex:1,minWidth:0,display:'flex',alignItems:'flex-start',paddingRight:88}});
   const cb=el('input',{type:'checkbox',style:{margin:0,marginTop:3,marginRight:14,width:16,height:16,cursor:'pointer',accentColor:p.color,flexShrink:0}});
   cb.checked=!!task.completed;
   cb.addEventListener('change',async()=>{task.completed=cb.checked;await saveTasks();render();});
@@ -308,15 +329,20 @@ function renderCard(task) {
   const content=el('div',{style:{flex:1,minWidth:0,display:'flex',flexDirection:'column',gap:6}});
 
   // 标题行
-  const titleRow=el('div',{style:{display:'flex',alignItems:'center',gap:10,flexWrap:'wrap'}});
+  const titleRow=el('div',{style:{display:'flex',alignItems:'center',gap:10,flexWrap:'nowrap',overflow:'hidden'}});
   titleRow.appendChild(el('span',{style:{background:p.bg,color:p.color,border:'1px solid '+p.border,borderRadius:5,padding:'2px 9px',fontSize:11.5,fontWeight:800,lineHeight:'1.5',flexShrink:0}},task.priority));
-  titleRow.appendChild(el('span',{style:{fontWeight:600,color:task.completed?'#94A3B8':'#1E293B',textDecoration:task.completed?'line-through':'none',fontSize:14.5,lineHeight:'1.5'}},task.title));
+  if(task.taskType) titleRow.appendChild(el('span',{style:{background:'#F8FAFC',color:'#64748B',border:'1px solid #E2E8F0',borderRadius:5,padding:'2px 7px',fontSize:11,fontWeight:600,lineHeight:'1.5',flexShrink:0}},task.taskType));
+  const titleSpan=el('span',{style:{fontWeight:600,color:task.completed?'#94A3B8':'#1E293B',textDecoration:task.completed?'line-through':'none',fontSize:14.5,lineHeight:'1.5',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',cursor:'default'}},task.title);
+  titleSpan.addEventListener('mouseenter',()=>showTip(titleSpan,task.title));
+  titleSpan.addEventListener('mouseleave',hideTip);
+  titleRow.appendChild(titleSpan);
   content.appendChild(titleRow);
 
   if(task.description) content.appendChild(el('p',{style:{fontSize:12.5,color:'#94A3B8',lineHeight:'1.5',margin:0}},task.description));
 
   if(task.deadline||task.reminderMinutes||task.intervalEnabled){
-    const infoRow=el('div',{style:{display:'flex',flexWrap:'nowrap',alignItems:'center',gap:10,fontSize:12,overflow:'hidden'}});
+    const infoRow=el('div',{style:{display:'flex',flexWrap:'wrap',alignItems:'center',gap:10,fontSize:12}});
+    if(task.createdAt) infoRow.appendChild(el('span',{style:{display:'inline-flex',alignItems:'center',gap:4,color:'#B0B8C6',flexShrink:0}},el('span',{},'🗓️'),el('span',{},new Date(task.createdAt).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit'}))));
     if(task.deadline){
       const color=tl?.expired?'#EF4444':tl?.urgent?'#F97316':'#94A3B8';
       infoRow.appendChild(el('span',{style:{display:'inline-flex',alignItems:'center',gap:4,color,fontWeight:tl?.expired||tl?.urgent?600:400,flexShrink:0}},
@@ -331,16 +357,17 @@ function renderCard(task) {
   leftZone.appendChild(content);
   card.appendChild(leftZone);
 
-  // 右侧操作
-  const actions=el('div',{style:{display:'flex',gap:6,flexShrink:0,alignItems:'center'}});
+  // 右上角操作（绝对定位）
+  const actions=el('div',{style:{position:'absolute',top:8,right:10,display:'flex',gap:3,alignItems:'center'}});
   const mkBtn=(icon,title,onclick,color)=>{
-    const b=btn(icon,onclick,{background:'none',border:'1px solid #E2E8F0',borderRadius:7,padding:'5px 9px',fontSize:13,color:color||'#64748B'});
+    const c0=color||'#C8D3DF';
+    const b=btn(icon,onclick,{background:'none',border:'none',borderRadius:6,padding:'3px 6px',fontSize:12.5,color:c0});
     b.title=title;
-    b.addEventListener('mouseenter',()=>{b.style.background='#F1F5F9';});
-    b.addEventListener('mouseleave',()=>{b.style.background='none';});
+    b.addEventListener('mouseenter',()=>{b.style.color=color||'#64748B';b.style.background='#F1F5F9';});
+    b.addEventListener('mouseleave',()=>{b.style.color=c0;b.style.background='none';});
     return b;
   };
-  actions.appendChild(mkBtn(cc>0?'💬'+cc:'💬','评论',()=>{state.commentTask=task;state.view='comments';render();},cc>0?'#3B82F6':'#64748B'));
+  actions.appendChild(mkBtn(cc>0?'💬'+cc:'💬','评论',()=>{state.commentTask=task;state.view='comments';render();},cc>0?'#3B82F6':undefined));
   actions.appendChild(mkBtn('✏️','编辑',()=>{state.editTask=task;state.view='edit';render();}));
   actions.appendChild(mkBtn('🗑️','删除',()=>{state.confirmDeleteId=task.id;state.view='confirm';render();}));
   card.appendChild(actions);
@@ -375,6 +402,7 @@ function renderTaskForm(isEdit) {
 
   // 优先级 + 截止时间卡片
   const pcCard=el('div',{style:groupCard});
+
   pcCard.appendChild(el('span',{style:sectionLabel},'📌 优先级'));
   const prow=el('div',{style:{display:'flex',gap:5,marginBottom:12}});
   const pBtns={};
@@ -397,10 +425,34 @@ function renderTaskForm(isEdit) {
     pBtns[k]=b; prow.appendChild(b);
   });
   pcCard.appendChild(prow);
+
+  // 类型选择器（chip 按钮组）
+  if(!f.taskType) f.taskType='任务';
+  pcCard.appendChild(el('span',{style:sectionLabel},'🏷️ 类型'));
+  const typeWrap=el('div',{style:{display:'flex',flexWrap:'wrap',gap:6,marginBottom:12}});
+  const typeChips={};
+  TASK_TYPES.forEach(t=>{
+    const active=f.taskType===t;
+    const chip=el('button',{style:{padding:'5px 12px',borderRadius:16,border:'1.5px solid '+(active?'#3B82F6':'#E2E8F0'),background:active?'#EFF6FF':'#F8FAFC',color:active?'#3B82F6':'#64748B',fontWeight:active?700:500,fontSize:12.5,cursor:'pointer',fontFamily:'inherit',transition:'all 0.15s'}},t);
+    chip.addEventListener('click',()=>{
+      f.taskType=t;
+      Object.entries(typeChips).forEach(([tk,tc])=>{
+        const sel=tk===t;
+        tc.style.border='1.5px solid '+(sel?'#3B82F6':'#E2E8F0');
+        tc.style.background=sel?'#EFF6FF':'#F8FAFC';
+        tc.style.color=sel?'#3B82F6':'#64748B';
+        tc.style.fontWeight=sel?'700':'500';
+      });
+    });
+    typeChips[t]=chip; typeWrap.appendChild(chip);
+  });
+  pcCard.appendChild(typeWrap);
+
   pcCard.appendChild(el('span',{style:sectionLabel},'📅 截止时间'));
   const dlInp=el('input',{type:'datetime-local',style:{...inpModern,flex:1}});
   dlInp.value=f.deadline||'';
   dlInp.addEventListener('change',()=>f.deadline=dlInp.value);
+  dlInp.addEventListener('click',()=>{ try{dlInp.showPicker();}catch(e){} });
   const clearDlBtn=btn('清空',()=>{dlInp.value='';f.deadline='';},
     {background:'transparent',color:'#94A3B8',border:'1px solid #E2E8F0',borderRadius:8,padding:'8px 12px',fontSize:12,fontWeight:500,flexShrink:0});
   pcCard.appendChild(el('div',{style:{display:'flex',gap:6,alignItems:'stretch'}},dlInp,clearDlBtn));
@@ -410,12 +462,19 @@ function renderTaskForm(isEdit) {
   const remCard=el('div',{style:groupCard});
   remCard.appendChild(el('span',{style:sectionLabel},'🔔 提醒设置'));
 
-  const remRow=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}});
-  remRow.appendChild(el('span',{style:{fontSize:13,color:'#475569'}},'截止前首次提醒'));
-  const remSel=el('select',{style:{padding:'5px 8px',border:'1px solid #E2E8F0',borderRadius:6,fontSize:12.5,background:'#fff',outline:'none',fontFamily:'inherit',cursor:'pointer'}});
-  REMINDER_OPTS.forEach(m=>{const o=el('option',{value:m},'提前 '+fmtMin(m));if(m===f.reminderMinutes)o.selected=true;remSel.appendChild(o);});
-  remSel.addEventListener('change',()=>f.reminderMinutes=Number(remSel.value));
-  remRow.appendChild(remSel); remCard.appendChild(remRow);
+  remCard.appendChild(el('div',{style:{fontSize:12,color:'#64748B',marginBottom:6}},'截止前首次提醒'));
+  const remChipWrap=el('div',{style:{display:'flex',flexWrap:'wrap',gap:6,marginBottom:12}});
+  const remChips={};
+  REMINDER_OPTS.forEach(m=>{
+    const active=m===f.reminderMinutes;
+    const chip=el('button',{style:{padding:'5px 12px',borderRadius:16,border:'1.5px solid '+(active?'#3B82F6':'#E2E8F0'),background:active?'#EFF6FF':'#F8FAFC',color:active?'#3B82F6':'#64748B',fontWeight:active?700:500,fontSize:12,cursor:'pointer',fontFamily:'inherit'}},`提前 ${fmtMin(m)}`);
+    chip.addEventListener('click',()=>{
+      f.reminderMinutes=m;
+      Object.entries(remChips).forEach(([k,c])=>{const sel=Number(k)===m;c.style.border='1.5px solid '+(sel?'#3B82F6':'#E2E8F0');c.style.background=sel?'#EFF6FF':'#F8FAFC';c.style.color=sel?'#3B82F6':'#64748B';c.style.fontWeight=sel?'700':'500';});
+    });
+    remChips[m]=chip; remChipWrap.appendChild(chip);
+  });
+  remCard.appendChild(remChipWrap);
 
   const ivRow=el('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}});
   ivRow.appendChild(el('div',{},el('span',{style:{fontSize:13,color:'#475569'}},'间歇性提醒'),el('span',{style:{fontSize:11,color:'#94A3B8',marginLeft:6}},'反复提醒直到完成')));
@@ -429,10 +488,11 @@ function renderTaskForm(isEdit) {
   const ivBtns={};
   INTERVAL_OPTS.forEach(m=>{
     const active=m===f.intervalMinutes;
-    const b=btn(fmtMin(m),()=>{
+    const b=el('button',{style:{padding:'5px 12px',borderRadius:16,border:'1.5px solid '+(active?'#3B82F6':'#E2E8F0'),background:active?'#EFF6FF':'#F8FAFC',color:active?'#3B82F6':'#64748B',fontWeight:active?700:500,fontSize:12,cursor:'pointer',fontFamily:'inherit'}},fmtMin(m));
+    b.addEventListener('click',()=>{
       f.intervalMinutes=m;
-      Object.entries(ivBtns).forEach(([k,v])=>{const sel=Number(k)===m;v.style.border='1px solid '+(sel?'#3B82F6':'#E2E8F0');v.style.background=sel?'#3B82F6':'#fff';v.style.color=sel?'#fff':'#64748B';});
-    },{padding:'4px 11px',borderRadius:14,fontSize:11.5,fontWeight:600,border:'1px solid '+(active?'#3B82F6':'#E2E8F0'),background:active?'#3B82F6':'#fff',color:active?'#fff':'#64748B'});
+      Object.entries(ivBtns).forEach(([k,v])=>{const sel=Number(k)===m;v.style.border='1.5px solid '+(sel?'#3B82F6':'#E2E8F0');v.style.background=sel?'#EFF6FF':'#F8FAFC';v.style.color=sel?'#3B82F6':'#64748B';v.style.fontWeight=sel?'700':'500';});
+    });
     ivBtns[m]=b; ivBtnWrap.appendChild(b);
   });
   ivBody.appendChild(ivBtnWrap); remCard.appendChild(ivBody);
